@@ -8,13 +8,28 @@ export default {
       username: email,
       password: password
     }
-    console.log(loginParams)
-    console.log(email)
-    console.log(password)
-    Vue.$http.post('/users', loginParams)
+    Vue.$http.post('/sessions', loginParams)
     .then(function (response) {
-      store.dispatch('login')
+      let data = response.data
+      if (data.success) {
+        store.dispatch('login', email)
+      }
       callback(response.data)
+    })
+    .catch(function (response) {
+      store.dispatch('logout')
+    })
+  },
+  signup (email, password, callback) {
+    console.log(store)
+    var signupParams = {
+      username: email,
+      password: password
+    }
+    Vue.$http.post('/users', signupParams)
+    .then(function (response) {
+      callback(response.data)
+      // console.log(response.data)
     })
     .catch(function (response) {
       store.dispatch('logout')

@@ -6,34 +6,40 @@ Vue.use(Vuex)
 
 // initial state of the app
 const state = {
-  auth: false
+  auth: false,
+  user: ''
 }
 
 // mutations are operations that actually mutates the state.
 // never call this directly. these actions are only called by `actions` below.
 const mutations = {
-  login (state) {
+  login (state, username) {
     console.log('mutations login')
     state.auth = true
-    router.push({ name: 'Posts.index' })
+    state.user = username
+    router.push({ name: 'Home' })
   },
   logout (state) {
     console.log('mutations logout')
     state.auth = false
-    router.push({ name: 'Users.sign_in' })
+    state.user = ''
+    router.push({ name: 'LogIn' })
   }
 }
 
 // operations that can be dispatched from other components.
 // example `store.dispatch('login')` will call `login` action and then mutate the state using `mutations.login`
 const actions = {
-  login: ({ commit }) => commit('login'),
+  login: ({ commit }, username) => commit('login', username),
   logout: ({ commit }) => commit('logout')
 }
 
 // just getter functions.
 const getters = {
-  loggedIn: state => state.auth
+  loggedIn: state => state.auth,
+  userLoggedIn (state) {
+    return state.user
+  }
 }
 
 // singleton pattern for ES6
