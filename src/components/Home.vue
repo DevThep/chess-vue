@@ -6,11 +6,16 @@
 
 <script>
 // import UsersApi from '../api/users.js'
-// import router from '../router'
+import router from '../router'
 
 export default {
   name: 'Home',
   data () {
+    console.log(this.$store.getters.loggedIn)
+    console.log(this.$store.getters.userLoggedIn)
+    if (!this.$store.getters.loggedIn) {
+      router.push({ name: 'LogIn' })
+    }
     return {
       msg: this.$store.getters.userLoggedIn
     }

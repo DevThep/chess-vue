@@ -33,11 +33,16 @@
 
 <script>
 import UsersApi from '../api/users.js'
-// import router from '../router'
+import router from '../router'
 
 export default {
   name: 'SignIn',
   data () {
+    console.log(this.$store.getters.loggedIn)
+    console.log(this.$store.getters.userLoggedIn)
+    if (this.$store.getters.loggedIn) {
+      router.push({ name: 'Home' })
+    }
     return {
       form: {
         email: '',
@@ -50,8 +55,6 @@ export default {
   },
   methods: {
     onSubmit (evt) {
-      // console.log(this.form.email)
-      // console.log(this.form.password)
       evt.preventDefault()
       UsersApi.login(this.form.email, this.form.password, function (_response) {
         console.log(_response)
