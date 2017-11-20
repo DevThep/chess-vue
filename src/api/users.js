@@ -35,15 +35,8 @@ export default {
       store.dispatch('logout')
     })
   },
-  logout (callback) {
+  logout () {
     console.log(store)
-    Vue.$http.delete('/users/api_sign_out.json')
-    .then(function (response) {
-      store.dispatch('logout')
-      callback(response.data)
-    })
-    .catch(function (response) {
-      store.dispatch('logout')
-    })
+    store.dispatch('logout')
   }
 }

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="signup">
     <img :src="pic" id="logo">
     <h1>{{ msg }}</h1>
     <h2>Sign Up</h2>
@@ -48,7 +48,7 @@ export default {
         password: ''
       },
       msg: 'Welcome to Chess App',
-      pic: require('../assets/king.png')
+      pic: require('../assets/board.svg')
     }
   },
   methods: {
@@ -92,5 +92,8 @@ a {
 .center_div{
     margin: 0 auto;
     width: 40%;
+}
+.signup{
+  padding-top: 45px;
 }
 </style>
