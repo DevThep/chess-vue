@@ -49,6 +49,9 @@
     <b-button @click="disconnect">Disconnect</b-button>
     <br>
     <h1>{{ reply }}</h1>
+    <div id="board1" style="width: 400px"></div>
+    <input type="button" id="startBtn" value="Start" />
+    <input type="button" id="clearBtn" value="Clear" />
   </div>
 </template>
 
@@ -70,6 +73,45 @@ export default {
       reply: ''
     }
   },
+  mounted() {
+    // var board = Chessboard(this.$refs.myDiv);
+    var board1 = ChessBoard($('#board1'), {
+        draggable: true,
+        dropOffBoard: 'trash',
+        // sparePieces: true
+      });
+    // $('#startBtn').on('click', board1.start);
+    $('#startBtn').on('click', function() {
+      board1.position({
+        a1: 'bP',
+        a3: 'bP',
+        b2: 'bP',
+        c1: 'bP',
+        c3: 'bP',
+        d2: 'bP',
+        e1: 'bP',
+        e3: 'bP',
+        f2: 'bP',
+        g1: 'bP',
+        g3: 'bP',
+        h2: 'bP',
+
+        b6: 'wP',
+        b8: 'wP',
+        a7: 'wP',
+        d6: 'wP',
+        d8: 'wP',
+        c7: 'wP',
+        e7: 'wP',
+        f6: 'wP',
+        f8: 'wP',
+        g7: 'wP',
+        h6: 'wP',
+        h8: 'wP'
+      });
+    });
+    $('#clearBtn').on('click', board1.clear);
+  },
   methods: {
     logout () {
       UsersApi.logout()
@@ -87,6 +129,7 @@ export default {
         "passcode": 'guest',
       //additional header
       };
+      console.log(this.$refs.myDiv);
       this.connetWM('http://localhost:3000/web_socket', headers, this.onConnected, this.onFailed);    
     },
     // getInvokeId () { 
