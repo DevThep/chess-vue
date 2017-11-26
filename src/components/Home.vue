@@ -67,7 +67,8 @@ export default {
       invokeIdCnt: 0,
       msg: this.$store.getters.userLoggedIn,
       text1: '',
-      reply: ''
+      reply: '',
+      user: this.$store.getters.userLoggedIn
     }
   },
   methods: {
@@ -83,7 +84,7 @@ export default {
     },         
     connectSrv () {
       var headers = {
-        "login": 'guest',
+        "user": this.user,
         "passcode": 'guest',
       //additional header
       };
