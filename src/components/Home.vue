@@ -65,7 +65,58 @@ export default {
   mounted () {
     var context = this;
     var that = this;
+    var removeGreySquares = function() {
+      $('#board1 .square-55d63').css('background', '');
+    };
+
+    var greySquare = function(square) {
+      var squareEl = $('#board1 .square-' + square);
+      
+      var background = '#a9a9a9';
+      if (squareEl.hasClass('black-3c85d') === true) {
+        background = '#696969';
+      }
+
+      squareEl.css('background', background);
+    };
+
+    var onDragStart = function(source, piece) {
+      // do not pick up pieces if the game is over
+      // or if it's not that side's turn
+      if (that.chess.game_over() === true ||
+          (that.chess.turn() === 'w' && piece.search(/^b/) !== -1) ||
+          (that.chess.turn() === 'b' && piece.search(/^w/) !== -1)) {
+        return false;
+      }
+    };
+
+    var onMouseoverSquare = function(square, piece) {
+      // get list of possible moves for this square
+      var moves = that.chess.moves({
+        square: square,
+        verbose: true
+      });
+
+      // exit if there are no moves available for this square
+      if (moves.length === 0) return;
+
+      if (that.player == that.turn){
+        // highlight the square they moused over
+        greySquare(square);
+
+        // highlight the possible squares for this piece
+        for (var i = 0; i < moves.length; i++) {
+          greySquare(moves[i].to);
+        }
+      }
+    };
+
+    var onMouseoutSquare = function(square, piece) {
+      removeGreySquares();
+    };
+
     var onDrop = function(source, target, piece, newPos, oldPos, orientation) {
+      removeGreySquares();
       console.log("Source: " + source);
       console.log("Target: " + target);
       console.log("Piece: " + piece);
@@ -81,11 +132,11 @@ export default {
       }
       console.log('BEFORE');
       console.log(that.chess.ascii());
-      if (that.chess.move({ from: source, to: target }) != null ) {
+      if (that.chess.move({ from: source, to: target, promotion: 'q' }) != null ) {
         // console.log(chess.ascii());
         let body =  JSON.stringify({ "from" : that.user, 
                   "command" : "move", 
-                  "fenBoard" : ChessBoard.objToFen(newPos),
+                  "fenBoard" : that.chess.fen(),
                   "source" : source,
                   "target" : target });
         context.sendWM(that.gameDest, body, 0, function (frame) {
@@ -105,11 +156,14 @@ export default {
       console.log(that.chess.ascii());
       return 'snapback';
     };
+
     this.board = ChessBoard($('#board1'), {
-        draggable: true,
-        onDrop: onDrop
-        // dropOffBoard: 'trash',
-        // sparePieces: true
+      draggable: true,
+      onDrop: onDrop,
+      onDragStart: onDragStart,
+      onMouseoutSquare: onMouseoutSquare,
+      onMouseoverSquare: onMouseoverSquare
+      // onSnapEnd: onSnapEnd
     });
     var board = this.board;
   },
@@ -189,6 +243,10 @@ export default {
         }
         this.turn = 1;
         this.board.start();
+        if (this.player == 2){
+          console.log('P2 board flip');
+          this.board.flip();
+        }
         this.chess = new Chess();
       } else if (reply === "switch") {
         console.log("fen : " + fenBoard);
@@ -203,6 +261,7 @@ export default {
     },
     disconnect (){
       this.disconnetWM();
+      this.board.clear();
     }
   },
   stompClient:{
