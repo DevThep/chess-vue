@@ -1,4 +1,5 @@
 import Vue from 'vue'
+import router from '@/router'
 import store from '../store'
 
 export default {
@@ -29,9 +30,14 @@ export default {
     Vue.$http.post('/users', signupParams)
     .then(function (response) {
       callback(response.data)
-      // console.log(response.data)
+      let data = response.data
+      if (data.success) {
+        router.push({ name: 'LogIn' })
+      }
+      callback(response.data)
     })
     .catch(function (response) {
+      console.log(response)
       store.dispatch('logout')
     })
   },

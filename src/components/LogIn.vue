@@ -4,7 +4,7 @@
     <h1>{{ msg }}</h1>
     <h2>Log In</h2>
     <div class="container center_div">
-      <h1>{{ error }}</h1>
+      <h1 style="font-size: 20px; color: red">{{ error }}</h1>
       <b-form @submit="onSubmit"> 
         <b-form-group id="exampleInputGroup1"
                       label="Email address:" label-for="exampleInput1">
@@ -21,7 +21,7 @@
           ></b-form-input>
         </b-form-group>
         <b-button type="submit" variant="primary">Log In</b-button>
-        <b-button type="reset" variant="secondary">Reset</b-button>
+        <b-button type="reset" variant="secondary" @click="reset">Reset</b-button>
       </b-form>
     <br>
     <router-link :to="{ name: 'SignUp'}">
@@ -56,12 +56,17 @@ export default {
   methods: {
     onSubmit (evt) {
       evt.preventDefault()
+      var self = this
       UsersApi.login(this.form.email, this.form.password, function (_response) {
         console.log(_response)
         if (!_response.success) {
+          self.error = 'Invalid username or password';
         }
       })
-    }
+    },
+    reset () {
+      this.error = '';
+    }         
   }
 }
 </script>

@@ -4,6 +4,7 @@
     <h1>{{ msg }}</h1>
     <h2>Sign Up</h2>
     <div class="container center_div">
+      <h1 style="font-size: 20px; color: red">{{ error }}</h1>
       <b-form @submit="onSubmit"> 
       <b-form-group id="exampleInputGroup1"
                     label="Email address:" label-for="exampleInput1">
@@ -20,7 +21,7 @@
         ></b-form-input>
       </b-form-group>
       <b-button type="submit" variant="primary">Sign Up</b-button>
-      <b-button type="reset" variant="secondary">Reset</b-button>
+      <b-button type="reset" variant="secondary" @click="reset">Reset</b-button>
     </b-form>
     <br>
     <router-link :to="{ name: 'LogIn'}">
@@ -37,8 +38,8 @@ import router from '../router'
 export default {
   name: 'SignUp',
   data () {
-    console.log(this.$store.getters.loggedIn)
-    console.log(this.$store.getters.userLoggedIn)
+    // console.log(this.$store.getters.loggedIn)
+    // console.log(this.$store.getters.userLoggedIn)
     if (this.$store.getters.loggedIn) {
       router.push({ name: 'Home' })
     }
@@ -47,18 +48,27 @@ export default {
         email: '',
         password: ''
       },
+      error: '',
       msg: 'Welcome to Chess App',
       pic: require('../assets/board.svg')
     }
   },
   methods: {
     onSubmit (evt) {
-      console.log(this.form.email)
-      console.log(this.form.password)
+      // console.log(this.form.email)
+      // console.log(this.form.password)
       evt.preventDefault()
+      var self = this
       UsersApi.signup(this.form.email, this.form.password, function (_response) {
         console.log(_response.success)
+        console.log(_response.description)
+        if (!_response.success) {
+          self.error = _response.description;
+        }
       })
+    },
+    reset () {
+      this.error = '';
     }
   }
 }
