@@ -4,34 +4,16 @@
 
       <b-navbar-toggle target="nav_collapse"></b-navbar-toggle>
 
-      <b-navbar-brand href="#">NavBar</b-navbar-brand>
+      <b-navbar-brand href="#">Chess App</b-navbar-brand>
 
       <b-collapse is-nav id="nav_collapse">
 
-        <b-navbar-nav>
-          <b-nav-item href="#">Link</b-nav-item>
-          <b-nav-item href="#" disabled>Disabled</b-nav-item>
-        </b-navbar-nav>
-
         <!-- Right aligned nav items -->
         <b-navbar-nav class="ml-auto">
-
-          <b-nav-form>
-            <b-form-input size="sm" class="mr-sm-2" type="text" placeholder="Search"/>
-            <b-button size="sm" class="my-2 my-sm-0" type="submit">Search</b-button>
-          </b-nav-form>
-
-          <b-nav-item-dropdown text="Lang" right>
-            <b-dropdown-item href="#">EN</b-dropdown-item>
-            <b-dropdown-item href="#">ES</b-dropdown-item>
-            <b-dropdown-item href="#">RU</b-dropdown-item>
-            <b-dropdown-item href="#">FA</b-dropdown-item>
-          </b-nav-item-dropdown>
-
           <b-nav-item-dropdown right>
             <!-- Using button-content slot -->
             <template slot="button-content">
-              <em>User</em>
+              <em>{{ user }}</em>
             </template>
             <b-dropdown-item href="#">Profile</b-dropdown-item>
             <b-dropdown-item href="#" @click="logout">Signout</b-dropdown-item>
@@ -51,6 +33,8 @@
     <b-button @click="disconnect">Disconnect</b-button>
     <br>
     <h1>{{ reply }}</h1>
+    <div id="board1" class="center_div" style="width: 550px; padding-top: 30px"></div>
+    <b-button style="margin-top: 20px" @click="printBoard">Print Board</b-button>
   </div>
 </template>
 
@@ -71,11 +55,70 @@ export default {
       text1: '',
       reply: '',
       user: this.$store.getters.userLoggedIn,
+      player: 0,
+      turn: 0,
+      board: null,
+      chess: null,
+      gameDest: ''
     }
+  },
+  mounted () {
+    var context = this;
+    var that = this;
+    var onDrop = function(source, target, piece, newPos, oldPos, orientation) {
+      console.log("Source: " + source);
+      console.log("Target: " + target);
+      console.log("Piece: " + piece);
+      console.log("New position: " + ChessBoard.objToFen(newPos));
+      console.log("Old position: " + ChessBoard.objToFen(oldPos));
+      console.log("Orientation: " + orientation);
+      console.log("--------------------");
+      console.log("player " + that.player);
+      console.log("turn " + that.turn);
+      // board.position('r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R')
+      if (that.turn != that.player){
+        return 'snapback';
+      }
+      console.log('BEFORE');
+      console.log(that.chess.ascii());
+      if (that.chess.move({ from: source, to: target }) != null ) {
+        // console.log(chess.ascii());
+        let body =  JSON.stringify({ "from" : that.user, 
+                  "command" : "move", 
+                  "fenBoard" : ChessBoard.objToFen(newPos),
+                  "source" : source,
+                  "target" : target });
+        context.sendWM(that.gameDest, body, 0, function (frame) {
+          console.log(JSON.parse(frame.body));
+          // let reply = JSON.parse(frame.body).reply;
+          // let switch_player = JSON.parse(frame.body).player;
+          // let fenBoard = JSON.parse(frame.body).fenBoard;
+          // console.log(switch_player);
+          // console.log(fenBoard);
+          // board.position(fenBoard);
+        }, 3000);
+        console.log('AFTER');
+        console.log(that.chess.ascii());
+        console.log('move success');
+        return;
+      }
+      console.log(that.chess.ascii());
+      return 'snapback';
+    };
+    this.board = ChessBoard($('#board1'), {
+        draggable: true,
+        onDrop: onDrop
+        // dropOffBoard: 'trash',
+        // sparePieces: true
+    });
+    var board = this.board;
   },
   methods: {
     logout () {
       UsersApi.logout()
+    },
+    printBoard (){
+      console.log(this.chess.ascii());
     },
     onConnected (frame) {
       console.log('Connected: ' + frame)
@@ -86,7 +129,10 @@ export default {
     },
     joinGame (){
       this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
-      this.$stompClient.subscribe('/sub/game', this.subscribeResponse, this.onFailed);
+      this.$stompClient.subscribe('/sub/game', this.gameResponse, this.onFailed);
+      this.gameDest = '/dest/msg/1'
+      let body =  JSON.stringify({ "from" : this.user, "command" : "start" })
+      this.sendWM(this.gameDest, body, this.invokeIdCnt, this.gameResponse, 3000);
     },
     gameMsg (){
       let destination = '/dest/msg/1'
@@ -120,15 +166,43 @@ export default {
       // let invokeId = frame.body.substr(invokeIdIndex, 4);
       // this.removeStompMonitor(invokeId);
     },
-    disconnect (){
-      this.disconnetWM();
-    },
     subscribeResponse (frame){
       console.log(JSON.parse(frame.body));
       this.reply = JSON.parse(frame.body).reply;
     },
-    unsubscribeResponse (frame){
-      console.log(JSON.parse(frame.body));
+    gameResponse (frame){
+      // console.log(JSON.parse(frame.body));
+      let reply = JSON.parse(frame.body).reply;
+      let turn = JSON.parse(frame.body).turn;
+      let player1 = JSON.parse(frame.body).player1;
+      let player2 = JSON.parse(frame.body).player2;
+      let fenBoard = JSON.parse(frame.body).fenBoard;
+      let source = JSON.parse(frame.body).source;
+      let target = JSON.parse(frame.body).target;
+      if (reply === "wait"){
+        console.log('waiting for P2');
+      } else if (reply === "start"){
+        if (this.user === player1){
+          this.player = 1;
+        } else if (this.user === player2){
+          this.player = 2;
+        }
+        this.turn = 1;
+        this.board.start();
+        this.chess = new Chess();
+      } else if (reply === "switch") {
+        console.log("fen : " + fenBoard);
+        console.log("source " + source);
+        console.log("target " + target);
+        this.turn = turn;
+        this.board.position(fenBoard);
+        this.chess.move({ from: source, to: target })
+        // console.log(this.chess.load(fenBoard));
+        console.log(this.chess.ascii());
+      }
+    },
+    disconnect (){
+      this.disconnetWM();
     }
   },
   stompClient:{
