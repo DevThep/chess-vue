@@ -46,6 +46,8 @@
      </div>
     <b-button @click="connectSrv">Connect</b-button>
     <b-button @click="send">Send</b-button>
+    <b-button @click="joinGame">Join Chess game</b-button>
+    <b-button @click="gameMsg">Game Send</b-button>
     <b-button @click="disconnect">Disconnect</b-button>
     <br>
     <h1>{{ reply }}</h1>
@@ -68,7 +70,7 @@ export default {
       msg: this.$store.getters.userLoggedIn,
       text1: '',
       reply: '',
-      user: this.$store.getters.userLoggedIn
+      user: this.$store.getters.userLoggedIn,
     }
   },
   methods: {
@@ -77,11 +79,21 @@ export default {
     },
     onConnected (frame) {
       console.log('Connected: ' + frame)
-      this.$stompClient.subscribe('/sub/message', this.responseCallback, this.onFailed);
+      this.$stompClient.subscribe('/sub/message', this.subscribeResponse,{ id: 'lobby' }, this.onFailed);
     },
     onFailed (frame) {
-      console.log('Failed: ' + frame)
-    },         
+      console.log('Failed: ' + frame);
+    },
+    joinGame (){
+      this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
+      this.$stompClient.subscribe('/sub/game', this.subscribeResponse, this.onFailed);
+    },
+    gameMsg (){
+      let destination = '/dest/msg/1'
+      let invokeId = this.invokeIdCnt;
+      let body =  JSON.stringify({ "from" : this.text1})
+      if (this.text1 != '') this.sendWM(destination, body, invokeId, this.responseCallback, 3000);
+    },        
     connectSrv () {
       var headers = {
         "user": this.user,
@@ -110,11 +122,18 @@ export default {
     },
     disconnect (){
       this.disconnetWM();
+    },
+    subscribeResponse (frame){
+      console.log(JSON.parse(frame.body));
+      this.reply = JSON.parse(frame.body).reply;
+    },
+    unsubscribeResponse (frame){
+      console.log(JSON.parse(frame.body));
     }
   },
   stompClient:{
     monitorIntervalTime: 100,
-    stompReconnect: true,
+    stompReconnect: false,
     timeout(orgCmd) {              
     }
   }
