@@ -13,7 +13,7 @@
           <b-nav-item-dropdown right>
             <!-- Using button-content slot -->
             <template slot="button-content">
-              <em>{{ user }}</em>
+              <em style="color:white;">{{ user }}</em>
             </template>
             <b-dropdown-item href="#">Profile</b-dropdown-item>
             <b-dropdown-item href="#" @click="logout">Signout</b-dropdown-item>
@@ -26,15 +26,14 @@
     <div class="container-fluid">
       <div class="row">
         <div class="col-lg-12 center_div">
-          <b-form-input v-model="text1" type="text" placeholder="Enter your name"></b-form-input>
-          <b-button @click="connectSrv">Connect</b-button>
-          <b-button @click="send" :disabled=sendDisabled>Send</b-button>
-          <b-button @click="joinGame">Join Chess game</b-button>
+          <b-button @click="connectSrv" variant="success">Connect</b-button>
 
-          <b-button @click="showModal">
+          <b-button @click="showModal" variant="info">
             Join Game Textbox
           </b-button>
-          <b-modal ref="myModalRef" hide-footer title="Using Component Methods">
+          <b-button @click="disconnect" variant="danger">Disconnect</b-button>
+
+          <b-modal ref="myModalRef" hide-footer>
             <div class="d-block text-center">
               <h3>Enter the game ID : </h3>
               <b-form @submit="onSubmit">
@@ -44,56 +43,29 @@
             </div>
             <b-btn class="mt-3" variant="outline-danger" block @click="hideModal">Close</b-btn>
           </b-modal>
-          <b-button @click="gameMsg">Game Send</b-button>
-          <b-button @click="disconnect">Disconnect</b-button>
         </div>
       </div>
 
       <div class="row">
         <div class="col-lg-4" style="padding-top: 15px;">
           <header>Games Available:</header>
-          <b-list-group>
-            <b-list-group-item>
+          <b-list-group >
+            <h3 v-if="gamesAvailable.length == 0" style="padding-top: 250px">No Games Available</h3>
+            <b-list-group-item v-for="game in gamesAvailable" :key="game.gameID">
               <div class="row">
                 <div class="col-4">
-                  Awesome list
+                  <b style="font-size: 10px;">Game ID: </b>{{ game.gameID }}
                 </div>
                 <div class="col-4">
-                  Awesome list
+                  <b style="font-size: 10px;">Host: </b>{{ game.hostName }}
                 </div>
                 <div class="col-4">
-                  Awesome list
-                </div>
-              </div>
-            </b-list-group-item>
-            <b-list-group-item>
-              <div class="row">
-                <div class="col-4">
-                  Awesome list
-                </div>
-                <div class="col-4">
-                  Awesome list
-                </div>
-                <div class="col-4">
-                  Awesome list
-                </div>
-              </div>
-            </b-list-group-item>
-            <b-list-group-item>
-              <div class="row">
-                <div class="col-4">
-                  Awesome list
-                </div>
-                <div class="col-4">
-                  Awesome list
-                </div>
-                <div class="col-4">
-                  Awesome list
+                  <b-button variant="primary" style="margin-left: 10px;" @click="join(game.gameID)">Join</b-button>
                 </div>
               </div>
             </b-list-group-item>
           </b-list-group>
-          <b-button class="col-12 refresh">Refresh</b-button>
+          <b-button class="col-12 refresh" @click="refresh">Refresh</b-button>
         </div>
         <div class="col-lg-4">
           <h1>{{ reply }}</h1>
@@ -128,7 +100,6 @@ export default {
       },
       invokeIdCnt: 0,
       msg: this.$store.getters.userLoggedIn,
-      text1: '',
       reply: '',
       user: this.$store.getters.userLoggedIn,
       player: 0,
@@ -136,125 +107,150 @@ export default {
       board: null,
       chess: null,
       gameDest: '',
-      currentGame: null,
-      sendDisabled: true
+      gamesAvailable: [],
+      isWaiting: null,
+      connected: false
     }
   },
   mounted () {
-    var context = this;
-    var that = this;
-    var removeGreySquares = function() {
-      $('#board1 .square-55d63').css('background', '');
-    };
+    this.$nextTick(function () {
+      // Code that will run only after the
+      // entire view has been rendered
+      this.refresh();
+      var context = this;
+      var that = this;
+      var removeGreySquares = function() {
+        $('#board1 .square-55d63').css('background', '');
+      };
 
-    var greySquare = function(square) {
-      var squareEl = $('#board1 .square-' + square);
-      
-      var background = '#a9a9a9';
-      if (squareEl.hasClass('black-3c85d') === true) {
-        background = '#696969';
-      }
-
-      squareEl.css('background', background);
-    };
-
-    var onDragStart = function(source, piece) {
-      // do not pick up pieces if the game is over
-      // or if it's not that side's turn
-      if (that.chess.game_over() === true ||
-          (that.chess.turn() === 'w' && piece.search(/^b/) !== -1) ||
-          (that.chess.turn() === 'b' && piece.search(/^w/) !== -1)) {
-        return false;
-      }
-    };
-
-    var onMouseoverSquare = function(square, piece) {
-      // get list of possible moves for this square
-      if (that.chess == null){
-        return;
-      }
-      var moves = that.chess.moves({
-        square: square,
-        verbose: true
-      });
-
-      // exit if there are no moves available for this square
-      if (moves.length === 0) return;
-
-      if (that.player == that.turn){
-        // highlight the square they moused over
-        greySquare(square);
-
-        // highlight the possible squares for this piece
-        for (var i = 0; i < moves.length; i++) {
-          greySquare(moves[i].to);
+      var greySquare = function(square) {
+        var squareEl = $('#board1 .square-' + square);
+        
+        var background = '#a9a9a9';
+        if (squareEl.hasClass('black-3c85d') === true) {
+          background = '#696969';
         }
-      }
-    };
 
-    var onMouseoutSquare = function(square, piece) {
-      removeGreySquares();
-    };
+        squareEl.css('background', background);
+      };
 
-    var onDrop = function(source, target, piece, newPos, oldPos, orientation) {
-      removeGreySquares();
-      console.log("Source: " + source);
-      console.log("Target: " + target);
-      console.log("Piece: " + piece);
-      console.log("New position: " + ChessBoard.objToFen(newPos));
-      console.log("Old position: " + ChessBoard.objToFen(oldPos));
-      console.log("Orientation: " + orientation);
-      console.log("--------------------");
-      console.log("player " + that.player);
-      console.log("turn " + that.turn);
-      // board.position('r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R')
-      if (that.turn != that.player){
-        return 'snapback';
-      }
-      console.log('BEFORE');
-      console.log(that.chess.ascii());
-      if (that.chess.move({ from: source, to: target, promotion: 'q' }) != null ) {
-        // console.log(chess.ascii());
-        let body =  JSON.stringify({ "from" : that.user, 
-                  "command" : "move", 
-                  "fenBoard" : that.chess.fen(),
-                  "source" : source,
-                  "target" : target });
-        context.sendWM(that.gameDest, body, 0, function (frame) {
-          console.log(JSON.parse(frame.body));
-          // let reply = JSON.parse(frame.body).reply;
-          // let switch_player = JSON.parse(frame.body).player;
-          // let fenBoard = JSON.parse(frame.body).fenBoard;
-          // console.log(switch_player);
-          // console.log(fenBoard);
-          // board.position(fenBoard);
-        }, 3000);
-        console.log('AFTER');
+      var onDragStart = function(source, piece) {
+        // do not pick up pieces if the game is over
+        // or if it's not that side's turn
+        if (that.chess.game_over() === true ||
+            (that.chess.turn() === 'w' && piece.search(/^b/) !== -1) ||
+            (that.chess.turn() === 'b' && piece.search(/^w/) !== -1)) {
+          return false;
+        }
+      };
+
+      var onMouseoverSquare = function(square, piece) {
+        // get list of possible moves for this square
+        if (that.chess == null){
+          return;
+        }
+        var moves = that.chess.moves({
+          square: square,
+          verbose: true
+        });
+
+        // exit if there are no moves available for this square
+        if (moves.length === 0) return;
+
+        if (that.player == that.turn){
+          // highlight the square they moused over
+          greySquare(square);
+
+          // highlight the possible squares for this piece
+          for (var i = 0; i < moves.length; i++) {
+            greySquare(moves[i].to);
+          }
+        }
+      };
+
+      var onMouseoutSquare = function(square, piece) {
+        removeGreySquares();
+      };
+
+      var onDrop = function(source, target, piece, newPos, oldPos, orientation) {
+        removeGreySquares();
+        console.log("Source: " + source);
+        console.log("Target: " + target);
+        console.log("Piece: " + piece);
+        console.log("New position: " + ChessBoard.objToFen(newPos));
+        console.log("Old position: " + ChessBoard.objToFen(oldPos));
+        console.log("Orientation: " + orientation);
+        console.log("--------------------");
+        console.log("player " + that.player);
+        console.log("turn " + that.turn);
+        // board.position('r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R')
+        if (that.turn != that.player){
+          return 'snapback';
+        }
+        console.log('BEFORE');
         console.log(that.chess.ascii());
-        console.log('move success');
-        return;
-      }
-      console.log(that.chess.ascii());
-      return 'snapback';
-    };
+        if (that.chess.move({ from: source, to: target, promotion: 'q' }) != null ) {
+          // console.log(chess.ascii());
+          let body =  JSON.stringify({ "from" : that.user, 
+                    "command" : "move", 
+                    "fenBoard" : that.chess.fen(),
+                    "source" : source,
+                    "target" : target });
+          context.sendWM(that.gameDest, body, 0, function (frame) {
+            console.log(JSON.parse(frame.body));
+            // let reply = JSON.parse(frame.body).reply;
+            // let switch_player = JSON.parse(frame.body).player;
+            // let fenBoard = JSON.parse(frame.body).fenBoard;
+            // console.log(switch_player);
+            // console.log(fenBoard);
+            // board.position(fenBoard);
+          }, 3000);
+          console.log('AFTER');
+          console.log(that.chess.ascii());
+          console.log('move success');
+          return;
+        }
+        console.log(that.chess.ascii());
+        return 'snapback';
+      };
 
-    this.board = ChessBoard($('#board1'), {
-      draggable: true,
-      onDrop: onDrop,
-      onDragStart: onDragStart,
-      onMouseoutSquare: onMouseoutSquare,
-      onMouseoverSquare: onMouseoverSquare
-      // onSnapEnd: onSnapEnd
-    });
-    var board = this.board;
+      this.board = ChessBoard($('#board1'), {
+        draggable: true,
+        onDrop: onDrop,
+        onDragStart: onDragStart,
+        onMouseoutSquare: onMouseoutSquare,
+        onMouseoverSquare: onMouseoverSquare
+        // onSnapEnd: onSnapEnd
+      });
+      var board = this.board;
+    })
   },
   methods: {
+    refresh() {
+      var response = [];
+      UsersApi.gamesAvailable(this.user, this.gameRequestCallback);
+      // console.log("arr length:  " + this.gamesAvailable.length);
+    },
+    gameRequestCallback (response){
+      console.log(response);
+      this.gamesAvailable = response;
+    },
     onSubmit (evt) {
       evt.preventDefault()
       if (this.form.gameID != null){
         this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
         this.$stompClient.subscribe('/sub/game', this.gameResponse, this.onFailed);
         this.gameDest = "/dest/msg/" + this.form.gameID;
+        let body =  JSON.stringify({ "from" : this.user, "command" : "start" })
+        this.hideModal();
+        this.sendWM(this.gameDest, body, this.invokeIdCnt, this.gameResponse, 3000);
+      }
+    },
+    join(gameID){
+      if (this.connected){
+        this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
+        this.$stompClient.subscribe('/sub/game', this.gameResponse, this.onFailed);
+        this.gameDest = "/dest/msg/" + gameID;
         let body =  JSON.stringify({ "from" : this.user, "command" : "start" })
         this.sendWM(this.gameDest, body, this.invokeIdCnt, this.gameResponse, 3000);
       }
@@ -273,24 +269,13 @@ export default {
     },
     onConnected (frame) {
       console.log('Connected: ' + frame)
+      this.connected = true;
       this.$stompClient.subscribe('/user/sub/message', this.subscribeResponse,{ id: 'lobby' }, this.onFailed);
     },
     onFailed (frame) {
       console.log('Failed: ' + frame);
-    },
-    joinGame (){
-      this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
-      this.$stompClient.subscribe('/sub/game', this.gameResponse, this.onFailed);
-      this.gameDest = '/dest/msg/1'
-      let body =  JSON.stringify({ "from" : this.user, "command" : "start" })
-      this.sendWM(this.gameDest, body, this.invokeIdCnt, this.gameResponse, 3000);
-    },
-    gameMsg (){
-      let destination = '/dest/msg/1'
-      let invokeId = this.invokeIdCnt;
-      let body =  JSON.stringify({ "from" : this.text1})
-      if (this.text1 != '') this.sendWM(destination, body, invokeId, this.responseCallback, 3000);
-    },        
+      this.connected = false;
+    },    
     connectSrv () {
       var headers = {
         "user": this.user,
@@ -298,12 +283,6 @@ export default {
       //additional header
       };
       this.connetWM('http://localhost:3000/web_socket', headers, this.onConnected, this.onFailed);    
-    },
-    send (){
-      let destination = this.gameDest;
-      let invokeId = this.invokeIdCnt;
-      let body =  JSON.stringify({ "from" : this.user})
-      this.sendWM(destination, body, invokeId, this.responseCallback, 3000);
     },
     create_game (){
       // have to first subscribe to /user/dest/create_game
@@ -328,7 +307,6 @@ export default {
         this.gameDest = gameDest;
         this.$stompClient.unsubscribe('lobby');
         this.$stompClient.subscribe('/sub/game', this.gameResponse, { id: 'game' }, this.onFailed);
-        this.sendDisabled = false;
         let request =  JSON.stringify({ "from" : this.user, "command" : "start" })
         this.sendWM(this.gameDest, request, this.invokeIdCnt, this.gameResponse, 3000);
       }
@@ -357,7 +335,10 @@ export default {
       let target = JSON.parse(frame.body).target;
       if (reply === "wait"){
         console.log('waiting for P2');
+        this.isWaiting = true;
       } else if (reply === "start"){
+        this.refresh();
+        this.isWaiting = false;
         if (this.user === player1){
           this.player = 1;
         } else if (this.user === player2){
@@ -383,8 +364,12 @@ export default {
     },
     disconnect (){
       this.disconnetWM();
-      this.sendDisabled = true;
       this.board.clear();
+      this.connected = false;
+      if (this.isWaiting && (this.user === this.player1)){
+        console.log('send request to delete the game');
+      }
+      this.isWaiting = null;
     }
   },
   stompClient:{
@@ -402,8 +387,8 @@ export default {
     margin: 0 auto;
     width: 40%;
   }
-  b-navbar{
-    padding-bottom: 20px;
+  .navbar {
+    margin-bottom: 20px;
   }
   .bg-info {
     background-color: #699ac5 !important;
@@ -415,6 +400,9 @@ export default {
     border-color: grey;
     overflow:hidden; 
     overflow-y:scroll;
+  }
+  .list-group-item:hover {
+    background-color: #c8f1f7;
   }
   .refresh {
     background-color: #92e5aa;

@@ -44,5 +44,14 @@ export default {
   logout () {
     console.log(store)
     store.dispatch('logout')
+  },
+  gamesAvailable (user, callback) {
+    Vue.$http.get(`/available/${user}`)
+    .then(function (response) {
+      // console.log(response.data);
+      callback(response.data.game)
+    })
+    .catch(function (response) {
+    })
   }
 }
