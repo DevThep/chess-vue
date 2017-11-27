@@ -27,14 +27,30 @@
       <b-form-input v-model="text1" type="text" placeholder="Enter your name"></b-form-input>
      </div>
     <b-button @click="connectSrv">Connect</b-button>
-    <b-button @click="send">Send</b-button>
+    <b-button @click="send" :disabled=sendDisabled>Send</b-button>
     <b-button @click="joinGame">Join Chess game</b-button>
+
+    <b-button @click="showModal">
+      Join Game Textbox
+    </b-button>
+    <b-modal ref="myModalRef" hide-footer title="Using Component Methods">
+      <div class="d-block text-center">
+        <h3>Enter the game ID : </h3>
+        <b-form @submit="onSubmit">
+          <b-form-input style="margin-bottom: 5px;" class="col-6 center_div" v-model="form.gameID" type="number" placeholder="game ID"></b-form-input>
+          <b-button type="submit" variant="primary">Join</b-button>
+        </b-form>
+      </div>
+      <b-btn class="mt-3" variant="outline-danger" block @click="hideModal">Close</b-btn>
+    </b-modal>
+
     <b-button @click="gameMsg">Game Send</b-button>
     <b-button @click="disconnect">Disconnect</b-button>
     <br>
     <h1>{{ reply }}</h1>
     <div id="board1" class="center_div" style="width: 550px; padding-top: 30px"></div>
     <b-button style="margin-top: 20px" @click="printBoard">Print Board</b-button>
+    <b-button style="margin-top: 20px" @click="create_game">Create Game</b-button>
   </div>
 </template>
 
@@ -50,6 +66,9 @@ export default {
       router.push({ name: 'LogIn' })
     }
     return {
+      form: {
+        gameID: null
+      },
       invokeIdCnt: 0,
       msg: this.$store.getters.userLoggedIn,
       text1: '',
@@ -59,7 +78,9 @@ export default {
       turn: 0,
       board: null,
       chess: null,
-      gameDest: ''
+      gameDest: '',
+      currentGame: null,
+      sendDisabled: true
     }
   },
   mounted () {
@@ -92,6 +113,9 @@ export default {
 
     var onMouseoverSquare = function(square, piece) {
       // get list of possible moves for this square
+      if (that.chess == null){
+        return;
+      }
       var moves = that.chess.moves({
         square: square,
         verbose: true
@@ -168,6 +192,16 @@ export default {
     var board = this.board;
   },
   methods: {
+    onSubmit (evt) {
+      evt.preventDefault()
+      alert(JSON.stringify(this.form))
+    },
+    showModal () {
+      this.$refs.myModalRef.show()
+    },
+    hideModal () {
+      this.$refs.myModalRef.hide()
+    },
     logout () {
       UsersApi.logout()
     },
@@ -176,7 +210,7 @@ export default {
     },
     onConnected (frame) {
       console.log('Connected: ' + frame)
-      this.$stompClient.subscribe('/sub/message', this.subscribeResponse,{ id: 'lobby' }, this.onFailed);
+      this.$stompClient.subscribe('/user/sub/message', this.subscribeResponse,{ id: 'lobby' }, this.onFailed);
     },
     onFailed (frame) {
       console.log('Failed: ' + frame);
@@ -202,27 +236,50 @@ export default {
       };
       this.connetWM('http://localhost:3000/web_socket', headers, this.onConnected, this.onFailed);    
     },
-    // getInvokeId () { 
-    //   let hex = (this.invokeIdCnt++ ).toString(16);
-    //   var zero = '0000';
-    //   var tmp  = 4-hex.length;
-    //   return zero.substr(0,tmp) + hex;
-    // },
     send (){
-      let destination = '/dest/msg'
+      let destination = this.gameDest;
       let invokeId = this.invokeIdCnt;
-      let body =  JSON.stringify({ "from" : this.text1})
-      if (this.text1 != '') this.sendWM(destination, body, invokeId, this.responseCallback, 3000);
+      let body =  JSON.stringify({ "from" : this.user})
+      this.sendWM(destination, body, invokeId, this.responseCallback, 3000);
+    },
+    create_game (){
+      // have to first subscribe to /user/dest/create_game
+      let destination = '/dest/create_game'
+      let body =  JSON.stringify({ "from" : this.user })
+      console.log('creating here');
+      this.sendWM(destination, body, this.invokeIdCnt, this.responseCallback, 3000);
     },
     responseCallback (frame){
       // console.log(JSON.parse(frame.body));
-      this.reply = JSON.parse(frame.body).reply;
+      // this.reply = JSON.parse(frame.body).reply;
       // let invokeId = frame.body.substr(invokeIdIndex, 4);
       // this.removeStompMonitor(invokeId);
     },
     subscribeResponse (frame){
       console.log(JSON.parse(frame.body));
-      this.reply = JSON.parse(frame.body).reply;
+      let response = JSON.parse(frame.body);
+      if (response.type === "gameReq"){
+        let chessID = response.chessID;
+        let gameDest = "/dest/msg/" + chessID;
+        console.log('DEST ' + gameDest);
+        this.gameDest = gameDest;
+        this.$stompClient.unsubscribe('lobby');
+        this.$stompClient.subscribe('/sub/game', this.gameCallback, { id: 'game' }, this.onFailed);
+        this.sendDisabled = false;
+      }
+      // this.reply = JSON.parse(frame.body).reply;
+    },
+    gameCallback (frame){
+      console.log('CREATED GAME');
+      console.log(JSON.parse(frame.body).reply);
+      // console.log(JSON.parse(frame.body));
+      // var chessID = JSON.parse(frame.body).chessID;
+      // var gameDest = "/dest/msg/" + chessID;
+      // console.log(gameDest);
+      // this.gameDest = gameDest;
+      // console.log(this.gameDest);
+      // this.$stompClient.unsubscribe('lobby');
+      // this.$stompClient.subscribe('/sub/game', this.responseCallback, { id: 'game' }, this.onFailed);
     },
     gameResponse (frame){
       // console.log(JSON.parse(frame.body));
@@ -261,6 +318,7 @@ export default {
     },
     disconnect (){
       this.disconnetWM();
+      this.sendDisabled = true;
       this.board.clear();
     }
   },
