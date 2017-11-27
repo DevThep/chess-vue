@@ -22,35 +22,92 @@
 
       </b-collapse>
     </b-navbar>
-    <h1>{{ msg }}</h1>
-    <div class="container center_div">
-      <b-form-input v-model="text1" type="text" placeholder="Enter your name"></b-form-input>
-     </div>
-    <b-button @click="connectSrv">Connect</b-button>
-    <b-button @click="send" :disabled=sendDisabled>Send</b-button>
-    <b-button @click="joinGame">Join Chess game</b-button>
 
-    <b-button @click="showModal">
-      Join Game Textbox
-    </b-button>
-    <b-modal ref="myModalRef" hide-footer title="Using Component Methods">
-      <div class="d-block text-center">
-        <h3>Enter the game ID : </h3>
-        <b-form @submit="onSubmit">
-          <b-form-input style="margin-bottom: 5px;" class="col-6 center_div" v-model="form.gameID" type="number" placeholder="game ID"></b-form-input>
-          <b-button type="submit" variant="primary">Join</b-button>
-        </b-form>
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-lg-12 center_div">
+          <b-form-input v-model="text1" type="text" placeholder="Enter your name"></b-form-input>
+          <b-button @click="connectSrv">Connect</b-button>
+          <b-button @click="send" :disabled=sendDisabled>Send</b-button>
+          <b-button @click="joinGame">Join Chess game</b-button>
+
+          <b-button @click="showModal">
+            Join Game Textbox
+          </b-button>
+          <b-modal ref="myModalRef" hide-footer title="Using Component Methods">
+            <div class="d-block text-center">
+              <h3>Enter the game ID : </h3>
+              <b-form @submit="onSubmit">
+                <b-form-input style="margin-bottom: 5px;" class="col-6 center_div" v-model="form.gameID" type="number" placeholder="game ID"></b-form-input>
+                <b-button type="submit" variant="primary">Join</b-button>
+              </b-form>
+            </div>
+            <b-btn class="mt-3" variant="outline-danger" block @click="hideModal">Close</b-btn>
+          </b-modal>
+          <b-button @click="gameMsg">Game Send</b-button>
+          <b-button @click="disconnect">Disconnect</b-button>
+        </div>
       </div>
-      <b-btn class="mt-3" variant="outline-danger" block @click="hideModal">Close</b-btn>
-    </b-modal>
 
-    <b-button @click="gameMsg">Game Send</b-button>
-    <b-button @click="disconnect">Disconnect</b-button>
+      <div class="row">
+        <div class="col-lg-4" style="padding-top: 15px;">
+          <header>Games Available:</header>
+          <b-list-group>
+            <b-list-group-item>
+              <div class="row">
+                <div class="col-4">
+                  Awesome list
+                </div>
+                <div class="col-4">
+                  Awesome list
+                </div>
+                <div class="col-4">
+                  Awesome list
+                </div>
+              </div>
+            </b-list-group-item>
+            <b-list-group-item>
+              <div class="row">
+                <div class="col-4">
+                  Awesome list
+                </div>
+                <div class="col-4">
+                  Awesome list
+                </div>
+                <div class="col-4">
+                  Awesome list
+                </div>
+              </div>
+            </b-list-group-item>
+            <b-list-group-item>
+              <div class="row">
+                <div class="col-4">
+                  Awesome list
+                </div>
+                <div class="col-4">
+                  Awesome list
+                </div>
+                <div class="col-4">
+                  Awesome list
+                </div>
+              </div>
+            </b-list-group-item>
+          </b-list-group>
+          <b-button class="col-12 refresh">Refresh</b-button>
+        </div>
+        <div class="col-lg-4">
+          <h1>{{ reply }}</h1>
+          <div id="board1" class="center_div" style="width: 550px; padding-top: 30px"></div>
+          <b-button style="margin-top: 20px" @click="printBoard">Print Board</b-button>
+          <b-button style="margin-top: 20px" @click="create_game">Create Game</b-button>
+        </div>
+        <div class="col-lg-4">
+          
+        </div>
+      </div>
+    </div>
+    
     <br>
-    <h1>{{ reply }}</h1>
-    <div id="board1" class="center_div" style="width: 550px; padding-top: 30px"></div>
-    <b-button style="margin-top: 20px" @click="printBoard">Print Board</b-button>
-    <b-button style="margin-top: 20px" @click="create_game">Create Game</b-button>
   </div>
 </template>
 
@@ -194,7 +251,13 @@ export default {
   methods: {
     onSubmit (evt) {
       evt.preventDefault()
-      alert(JSON.stringify(this.form))
+      if (this.form.gameID != null){
+        this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
+        this.$stompClient.subscribe('/sub/game', this.gameResponse, this.onFailed);
+        this.gameDest = "/dest/msg/" + this.form.gameID;
+        let body =  JSON.stringify({ "from" : this.user, "command" : "start" })
+        this.sendWM(this.gameDest, body, this.invokeIdCnt, this.gameResponse, 3000);
+      }
     },
     showModal () {
       this.$refs.myModalRef.show()
@@ -264,8 +327,10 @@ export default {
         console.log('DEST ' + gameDest);
         this.gameDest = gameDest;
         this.$stompClient.unsubscribe('lobby');
-        this.$stompClient.subscribe('/sub/game', this.gameCallback, { id: 'game' }, this.onFailed);
+        this.$stompClient.subscribe('/sub/game', this.gameResponse, { id: 'game' }, this.onFailed);
         this.sendDisabled = false;
+        let request =  JSON.stringify({ "from" : this.user, "command" : "start" })
+        this.sendWM(this.gameDest, request, this.invokeIdCnt, this.gameResponse, 3000);
       }
       // this.reply = JSON.parse(frame.body).reply;
     },
@@ -339,5 +404,22 @@ export default {
   }
   b-navbar{
     padding-bottom: 20px;
+  }
+  .bg-info {
+    background-color: #699ac5 !important;
+  }
+  .list-group {
+    height:578px;
+    border-style: solid;
+    border-radius: 2px;
+    border-color: grey;
+    overflow:hidden; 
+    overflow-y:scroll;
+  }
+  .refresh {
+    background-color: #92e5aa;
+  }
+  .refresh:hover {
+    background-color: #529665;
   }
 </style>
