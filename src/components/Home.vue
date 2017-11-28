@@ -78,6 +78,27 @@
         <div class="col-lg-4" style="padding-top: 15px;">
           <header>Game Info:</header>
           <b-list-group class="gameInfoList">
+            <b-list-group-item v-if="!inGame && !isWaiting" style="padding-top: 75px"><h2>Not in Game</h2></b-list-group-item>
+            <b-list-group-item v-if="isWaiting" style="padding-top: 75px"><h2>Waiting for opponents</h2></b-list-group-item>
+            <b-list-group-item v-if="inGame">
+              <b>Game ID: </b>{{ gameDestInt }}
+            </b-list-group-item>
+            <b-list-group-item v-if="inGame">
+              <b>Host: </b>
+              <h6 v-if="isHost">You</h6>
+              <h6 v-else>{{ opponent }}</h6>
+            </b-list-group-item>
+            <b-list-group-item v-if="inGame">
+              <b>Playing Against: </b><h4>{{ opponent }}</h4>
+            </b-list-group-item>
+            <b-list-group-item v-if="inGame">
+              <b>Turn: </b>
+              <h3 v-if="turn == player" style="color: green;">Your Turn</h3>
+              <h3 v-else style="color: red;">Your Opponents Turn</h3>
+            </b-list-group-item>
+          </b-list-group>
+          <header>Games Paused:</header>
+          <b-list-group class="gamePausedList">
             <b-list-group-item v-for="game in gamesAvailable" :key="game.gameID">
               <div class="row">
                 <div class="col-4">
@@ -87,11 +108,12 @@
                   <b style="font-size: 10px;">Host: </b>{{ game.hostName }}
                 </div>
                 <div class="col-4">
-                  <b-button variant="primary" style="margin-left: 10px;" @click="join(game.gameID)">Join</b-button>
+                  <b-button variant="success" style="margin-left: 10px;">Resume</b-button>
                 </div>
               </div>
             </b-list-group-item>
           </b-list-group>
+          <b-button class="col-12 refresh" @click="refresh">Refresh</b-button>
         </div>
       </div>
     </div>
@@ -126,12 +148,15 @@ export default {
       gameDest: '',
       gameDestInt: null,
       gamesAvailable: [],
+      gamesPaused: [],
       isWaiting: null,
       connected: false,
       disconnectDisabled: true,
       createGameDisabled: true,
       joinGameDisabled: true,
-      isHost: false
+      isHost: false,
+      inGame:false,
+      opponent: ''
     }
   },
   mounted () {
@@ -361,14 +386,17 @@ export default {
         this.isHost = true;
         this.isWaiting = true;
       } else if (reply === "start"){
+        this.inGame = true;
         this.createGameDisabled = true;
         this.joinGameDisabled = true;
         this.refresh();
         this.isWaiting = false;
         if (this.user === player1){
           this.player = 1;
+          this.opponent = player2;
         } else if (this.user === player2){
           this.player = 2;
+          this.opponent = player1;
         }
         this.turn = 1;
         this.board.start();
@@ -396,6 +424,7 @@ export default {
         console.log('sent request to delete the game');
         UsersApi.deleteGame(this.gameDestInt);
       }
+      this.inGame = false;
       this.disconnectDisabled = true;
       this.joinGameDisabled = true;
       this.createGameDisabled = true;
@@ -405,6 +434,9 @@ export default {
       this.refresh();
       this.board.flip();
       this.player = 0;
+      this.opponent = '';
+      this.gameDest = '';
+      this.gameDestInt = null;
     }
   },
   stompClient:{
@@ -437,6 +469,14 @@ export default {
     overflow-y:scroll;
   }
   .gameInfoList {
+    height:300px;
+    border-style: solid;
+    border-radius: 2px;
+    border-color: grey;
+    overflow:hidden; 
+    overflow-y:scroll;
+  }
+  .gamePausedList {
     height:300px;
     border-style: solid;
     border-radius: 2px;
