@@ -53,5 +53,13 @@ export default {
     })
     .catch(function (response) {
     })
+  },
+  deleteGame (chessID) {
+    Vue.$http.delete(`/delete/${chessID}`)
+    .then(function (response) {
+      console.log("Game Deleted");
+    })
+    .catch(function (response) {
+    })
   }
 }

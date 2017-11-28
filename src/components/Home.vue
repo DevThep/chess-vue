@@ -26,12 +26,12 @@
     <div class="container-fluid">
       <div class="row">
         <div class="col-lg-12 center_div">
-          <b-button @click="connectSrv" variant="success">Connect</b-button>
+          <b-button @click="connectSrv" variant="success" :disabled=connected>Connect</b-button>
 
-          <b-button @click="showModal" variant="info">
+          <b-button @click="showModal" variant="info" :disabled=joinGameDisabled>
             Join Game Textbox
           </b-button>
-          <b-button @click="disconnect" variant="danger">Disconnect</b-button>
+          <b-button @click="disconnect" variant="danger" :disabled=disconnectDisabled>Disconnect</b-button>
 
           <b-modal ref="myModalRef" hide-footer>
             <div class="d-block text-center">
@@ -49,8 +49,35 @@
       <div class="row">
         <div class="col-lg-4" style="padding-top: 15px;">
           <header>Games Available:</header>
-          <b-list-group >
+          <b-list-group class="gamesList">
             <h3 v-if="gamesAvailable.length == 0" style="padding-top: 250px">No Games Available</h3>
+            <b-list-group-item v-for="game in gamesAvailable" :key="game.gameID">
+              <div class="row">
+                <div class="col-4">
+                  <b style="font-size: 10px;">Game ID: </b>{{ game.gameID }}
+                </div>
+                <div class="col-4">
+                  <b style="font-size: 10px;">Host: </b>{{ game.hostName }}
+                </div>
+                <div class="col-4">
+                  <b-button variant="primary" style="margin-left: 10px;" @click="join(game.gameID)" :disabled=joinGameDisabled>
+                    Join
+                  </b-button>
+                </div>
+              </div>
+            </b-list-group-item>
+          </b-list-group>
+          <b-button class="col-12 refresh" @click="refresh">Refresh</b-button>
+        </div>
+        <div class="col-lg-4">
+          <h1>{{ reply }}</h1>
+          <div id="board1" class="center_div" style="width: 500px; padding-top: 30px"></div>
+          <b-button style="margin-top: 20px" @click="printBoard">Print Board</b-button>
+          <b-button style="margin-top: 20px" @click="create_game" :disabled=createGameDisabled>Create Game</b-button>
+        </div>
+        <div class="col-lg-4" style="padding-top: 15px;">
+          <header>Game Info:</header>
+          <b-list-group class="gameInfoList">
             <b-list-group-item v-for="game in gamesAvailable" :key="game.gameID">
               <div class="row">
                 <div class="col-4">
@@ -65,16 +92,6 @@
               </div>
             </b-list-group-item>
           </b-list-group>
-          <b-button class="col-12 refresh" @click="refresh">Refresh</b-button>
-        </div>
-        <div class="col-lg-4">
-          <h1>{{ reply }}</h1>
-          <div id="board1" class="center_div" style="width: 550px; padding-top: 30px"></div>
-          <b-button style="margin-top: 20px" @click="printBoard">Print Board</b-button>
-          <b-button style="margin-top: 20px" @click="create_game">Create Game</b-button>
-        </div>
-        <div class="col-lg-4">
-          
         </div>
       </div>
     </div>
@@ -107,9 +124,14 @@ export default {
       board: null,
       chess: null,
       gameDest: '',
+      gameDestInt: null,
       gamesAvailable: [],
       isWaiting: null,
-      connected: false
+      connected: false,
+      disconnectDisabled: true,
+      createGameDisabled: true,
+      joinGameDisabled: true,
+      isHost: false
     }
   },
   mounted () {
@@ -184,7 +206,11 @@ export default {
         console.log("player " + that.player);
         console.log("turn " + that.turn);
         // board.position('r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R')
+        let check =  JSON.stringify({ "from" : that.user });
         if (that.turn != that.player){
+          context.sendWM(that.gameDest, check, 0, function (frame) {
+            console.log(JSON.parse(frame.body));
+          }, 3000);
           return 'snapback';
         }
         console.log('BEFORE');
@@ -198,12 +224,6 @@ export default {
                     "target" : target });
           context.sendWM(that.gameDest, body, 0, function (frame) {
             console.log(JSON.parse(frame.body));
-            // let reply = JSON.parse(frame.body).reply;
-            // let switch_player = JSON.parse(frame.body).player;
-            // let fenBoard = JSON.parse(frame.body).fenBoard;
-            // console.log(switch_player);
-            // console.log(fenBoard);
-            // board.position(fenBoard);
           }, 3000);
           console.log('AFTER');
           console.log(that.chess.ascii());
@@ -238,9 +258,11 @@ export default {
     onSubmit (evt) {
       evt.preventDefault()
       if (this.form.gameID != null){
-        this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
-        this.$stompClient.subscribe('/sub/game', this.gameResponse, this.onFailed);
         this.gameDest = "/dest/msg/" + this.form.gameID;
+        this.gameDestInt = this.form.gameID;
+        this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
+        this.$stompClient.subscribe('/sub/game/' + this.form.gameID, this.gameResponse,
+          { id: 'game'+this.gameDestInt }, this.onFailed);
         let body =  JSON.stringify({ "from" : this.user, "command" : "start" })
         this.hideModal();
         this.sendWM(this.gameDest, body, this.invokeIdCnt, this.gameResponse, 3000);
@@ -249,8 +271,9 @@ export default {
     join(gameID){
       if (this.connected){
         this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
-        this.$stompClient.subscribe('/sub/game', this.gameResponse, this.onFailed);
+        this.$stompClient.subscribe('/sub/game/' + gameID, this.gameResponse,{ id: 'game'+gameID }, this.onFailed);
         this.gameDest = "/dest/msg/" + gameID;
+        this.gameDestInt = gameID;
         let body =  JSON.stringify({ "from" : this.user, "command" : "start" })
         this.sendWM(this.gameDest, body, this.invokeIdCnt, this.gameResponse, 3000);
       }
@@ -270,6 +293,9 @@ export default {
     onConnected (frame) {
       console.log('Connected: ' + frame)
       this.connected = true;
+      this.joinGameDisabled = false;
+      this.disconnectDisabled = false;
+      this.createGameDisabled = false;
       this.$stompClient.subscribe('/user/sub/message', this.subscribeResponse,{ id: 'lobby' }, this.onFailed);
     },
     onFailed (frame) {
@@ -292,10 +318,6 @@ export default {
       this.sendWM(destination, body, this.invokeIdCnt, this.responseCallback, 3000);
     },
     responseCallback (frame){
-      // console.log(JSON.parse(frame.body));
-      // this.reply = JSON.parse(frame.body).reply;
-      // let invokeId = frame.body.substr(invokeIdIndex, 4);
-      // this.removeStompMonitor(invokeId);
     },
     subscribeResponse (frame){
       console.log(JSON.parse(frame.body));
@@ -305,24 +327,15 @@ export default {
         let gameDest = "/dest/msg/" + chessID;
         console.log('DEST ' + gameDest);
         this.gameDest = gameDest;
+        this.gameDestInt = chessID;
+        this.joinGameDisabled = true;
+        this.createGameDisabled = true;
         this.$stompClient.unsubscribe('lobby');
-        this.$stompClient.subscribe('/sub/game', this.gameResponse, { id: 'game' }, this.onFailed);
+        this.$stompClient.subscribe('/sub/game/' + chessID, this.gameResponse, { id: 'game'+chessID }, this.onFailed);
         let request =  JSON.stringify({ "from" : this.user, "command" : "start" })
         this.sendWM(this.gameDest, request, this.invokeIdCnt, this.gameResponse, 3000);
       }
       // this.reply = JSON.parse(frame.body).reply;
-    },
-    gameCallback (frame){
-      console.log('CREATED GAME');
-      console.log(JSON.parse(frame.body).reply);
-      // console.log(JSON.parse(frame.body));
-      // var chessID = JSON.parse(frame.body).chessID;
-      // var gameDest = "/dest/msg/" + chessID;
-      // console.log(gameDest);
-      // this.gameDest = gameDest;
-      // console.log(this.gameDest);
-      // this.$stompClient.unsubscribe('lobby');
-      // this.$stompClient.subscribe('/sub/game', this.responseCallback, { id: 'game' }, this.onFailed);
     },
     gameResponse (frame){
       // console.log(JSON.parse(frame.body));
@@ -333,10 +346,23 @@ export default {
       let fenBoard = JSON.parse(frame.body).fenBoard;
       let source = JSON.parse(frame.body).source;
       let target = JSON.parse(frame.body).target;
+      if (reply === "disconnect"){
+        console.log('Other player offline');
+        this.disconnect();
+        return;
+      }
+      if (reply === "Error"){
+        this.$stompClient.unsubscribe('game'+this.gameDestInt);
+        this.refresh();
+        return;
+      }
       if (reply === "wait"){
         console.log('waiting for P2');
+        this.isHost = true;
         this.isWaiting = true;
       } else if (reply === "start"){
+        this.createGameDisabled = true;
+        this.joinGameDisabled = true;
         this.refresh();
         this.isWaiting = false;
         if (this.user === player1){
@@ -366,10 +392,19 @@ export default {
       this.disconnetWM();
       this.board.clear();
       this.connected = false;
-      if (this.isWaiting && (this.user === this.player1)){
-        console.log('send request to delete the game');
+      if (this.isWaiting && this.isHost){
+        console.log('sent request to delete the game');
+        UsersApi.deleteGame(this.gameDestInt);
       }
+      this.disconnectDisabled = true;
+      this.joinGameDisabled = true;
+      this.createGameDisabled = true;
+      this.isHost = false;
       this.isWaiting = null;
+      this.chess = null;
+      this.refresh();
+      this.board.flip();
+      this.player = 0;
     }
   },
   stompClient:{
@@ -393,8 +428,16 @@ export default {
   .bg-info {
     background-color: #699ac5 !important;
   }
-  .list-group {
+  .gamesList {
     height:578px;
+    border-style: solid;
+    border-radius: 2px;
+    border-color: grey;
+    overflow:hidden; 
+    overflow-y:scroll;
+  }
+  .gameInfoList {
+    height:300px;
     border-style: solid;
     border-radius: 2px;
     border-color: grey;
