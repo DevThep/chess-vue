@@ -54,6 +54,15 @@ export default {
     .catch(function (response) {
     })
   },
+  ongoingGames (user, callback) {
+    Vue.$http.get(`/ongoing/${user}`)
+    .then(function (response) {
+      console.log(response.data);
+      callback(response.data.game)
+    })
+    .catch(function (response) {
+    })
+  },
   deleteGame (chessID) {
     Vue.$http.delete(`/delete/${chessID}`)
     .then(function (response) {

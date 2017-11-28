@@ -70,16 +70,15 @@
           <b-button class="col-12 refresh" @click="refresh">Refresh</b-button>
         </div>
         <div class="col-lg-4">
-          <h1>{{ reply }}</h1>
           <div id="board1" class="center_div" style="width: 500px; padding-top: 30px"></div>
           <b-button style="margin-top: 20px" @click="printBoard">Print Board</b-button>
           <b-button style="margin-top: 20px" @click="create_game" :disabled=createGameDisabled>Create Game</b-button>
         </div>
         <div class="col-lg-4" style="padding-top: 15px;">
           <header>Game Info:</header>
-          <b-list-group class="gameInfoList">
-            <b-list-group-item v-if="!inGame && !isWaiting" style="padding-top: 75px"><h2>Not in Game</h2></b-list-group-item>
-            <b-list-group-item v-if="isWaiting" style="padding-top: 75px"><h2>Waiting for opponents</h2></b-list-group-item>
+          <b-list-group class="gameInfoList" v-if="!isGameOver">
+            <b-list-group-item v-if="!inGame && !isWaiting" style="padding-top: 75px;height: 100%;"><h2>Not in Game</h2></b-list-group-item>
+            <b-list-group-item v-if="isWaiting" style="padding-top: 75px;height: 100%;"><h2>Waiting for opponents</h2></b-list-group-item>
             <b-list-group-item v-if="inGame">
               <b>Game ID: </b>{{ gameDestInt }}
             </b-list-group-item>
@@ -97,10 +96,15 @@
               <h3 v-else style="color: red;">Your Opponents Turn</h3>
             </b-list-group-item>
           </b-list-group>
+          <b-list-group class="gameInfoList" v-else>
+            <b-list-group-item style="padding-top: 105px; height: 100%; background-color:#89f442"><h2>Game Over</h2>
+            <b-button @click="disconnect" variant="danger" :disabled=disconnectDisabled>Leave</b-button>
+            </b-list-group-item>
+          </b-list-group>
           <header>Games Paused:</header>
           <b-list-group class="gamePausedList">
-            <b-list-group-item v-for="game in gamesAvailable" :key="game.gameID">
-              <div class="row">
+            <b-list-group-item v-for="game in gamesPaused" :key="game.gameID">
+              <div class="row" v-if="gameDestInt != game.gameID">
                 <div class="col-4">
                   <b style="font-size: 10px;">Game ID: </b>{{ game.gameID }}
                 </div>
@@ -108,12 +112,12 @@
                   <b style="font-size: 10px;">Host: </b>{{ game.hostName }}
                 </div>
                 <div class="col-4">
-                  <b-button variant="success" style="margin-left: 10px;">Resume</b-button>
+                  <b-button variant="success" style="margin-left: 10px;" @click="resume(game.gameID,game.hostName)" :disabled=resumeDisabled>Resume</b-button>
                 </div>
               </div>
             </b-list-group-item>
           </b-list-group>
-          <b-button class="col-12 refresh" @click="refresh">Refresh</b-button>
+          <b-button class="col-12 refresh" @click="getPausedGames">Refresh</b-button>
         </div>
       </div>
     </div>
@@ -138,8 +142,6 @@ export default {
         gameID: null
       },
       invokeIdCnt: 0,
-      msg: this.$store.getters.userLoggedIn,
-      reply: '',
       user: this.$store.getters.userLoggedIn,
       player: 0,
       turn: 0,
@@ -154,9 +156,11 @@ export default {
       disconnectDisabled: true,
       createGameDisabled: true,
       joinGameDisabled: true,
+      resumeDisabled: false,
       isHost: false,
       inGame:false,
-      opponent: ''
+      opponent: '',
+      isGameOver: false
     }
   },
   mounted () {
@@ -186,7 +190,9 @@ export default {
         // or if it's not that side's turn
         if (that.chess.game_over() === true ||
             (that.chess.turn() === 'w' && piece.search(/^b/) !== -1) ||
-            (that.chess.turn() === 'b' && piece.search(/^w/) !== -1)) {
+            (that.chess.turn() === 'b' && piece.search(/^w/) !== -1)) {  
+          that.isGameOver = true;
+          that.deleteGame();
           return false;
         }
       };
@@ -276,9 +282,18 @@ export default {
       UsersApi.gamesAvailable(this.user, this.gameRequestCallback);
       // console.log("arr length:  " + this.gamesAvailable.length);
     },
+    getPausedGames() {
+      var response = [];
+      UsersApi.ongoingGames(this.user, this.pausedGameCallback);
+      // console.log("arr length:  " + this.gamesAvailable.length);
+    },
     gameRequestCallback (response){
       console.log(response);
       this.gamesAvailable = response;
+    },
+    pausedGameCallback (response){
+      console.log(response);
+      this.gamesPaused = response;
     },
     onSubmit (evt) {
       evt.preventDefault()
@@ -319,6 +334,7 @@ export default {
       console.log('Connected: ' + frame)
       this.connected = true;
       this.joinGameDisabled = false;
+      this.resumeDisabled = false;
       this.disconnectDisabled = false;
       this.createGameDisabled = false;
       this.$stompClient.subscribe('/user/sub/message', this.subscribeResponse,{ id: 'lobby' }, this.onFailed);
@@ -342,6 +358,21 @@ export default {
       console.log('creating here');
       this.sendWM(destination, body, this.invokeIdCnt, this.responseCallback, 3000);
     },
+    resume (gameID,host){
+      if (this.connected){
+        this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
+        this.$stompClient.subscribe('/sub/game/' + gameID, this.resumedGameResponse,{ id: 'game'+gameID }, this.onFailed);
+        this.gameDest = "/dest/msg/" + gameID;
+        console.log(this.gameDest);
+        this.gameDestInt = gameID;
+        console.log('Host ' + host);
+        if (this.user === host){
+          this.isHost = true;
+        }
+        let body =  JSON.stringify({ "from" : this.user, "command" : "resume" })
+        this.sendWM(this.gameDest, body, this.invokeIdCnt, this.resumedGameResponse, 3000);
+      }
+    },
     responseCallback (frame){
     },
     subscribeResponse (frame){
@@ -360,10 +391,8 @@ export default {
         let request =  JSON.stringify({ "from" : this.user, "command" : "start" })
         this.sendWM(this.gameDest, request, this.invokeIdCnt, this.gameResponse, 3000);
       }
-      // this.reply = JSON.parse(frame.body).reply;
     },
     gameResponse (frame){
-      // console.log(JSON.parse(frame.body));
       let reply = JSON.parse(frame.body).reply;
       let turn = JSON.parse(frame.body).turn;
       let player1 = JSON.parse(frame.body).player1;
@@ -389,6 +418,7 @@ export default {
         this.inGame = true;
         this.createGameDisabled = true;
         this.joinGameDisabled = true;
+        this.resumeDisabled = true;
         this.refresh();
         this.isWaiting = false;
         if (this.user === player1){
@@ -416,27 +446,91 @@ export default {
         console.log(this.chess.ascii());
       }
     },
+    resumedGameResponse (frame){
+      let reply = JSON.parse(frame.body).reply;
+      let turn = JSON.parse(frame.body).turn;
+      let player1 = JSON.parse(frame.body).player1;
+      let player2 = JSON.parse(frame.body).player2;
+      let fenBoard = JSON.parse(frame.body).fenBoard;
+      let source = JSON.parse(frame.body).source;
+      let target = JSON.parse(frame.body).target;
+      if (reply === "disconnect"){
+        console.log('Other player offline');
+        this.disconnect();
+        return;
+      }
+      if (reply === "Error"){
+        this.$stompClient.unsubscribe('game'+this.gameDestInt);
+        this.refresh();
+        return;
+      }
+      if (reply === "wait"){
+        console.log('waiting for P2');
+        this.resumeDisabled = true;
+        this.isWaiting = true;
+      } else if (reply === "start"){
+        console.log(JSON.parse(frame.body));
+        this.inGame = true;
+        this.createGameDisabled = true;
+        this.joinGameDisabled = true;
+        this.resumeDisabled = true;
+        this.refresh();
+        this.getPausedGames();
+        this.isWaiting = false;
+        if (this.user === player1){
+          this.player = 1;
+          this.opponent = player2;
+        } else if (this.user === player2){
+          this.player = 2;
+          this.opponent = player1;
+        }
+        this.turn = turn;
+        this.board.position(fenBoard);
+        this.board.orientation('white');
+        if (this.player == 2){
+          console.log('P2 board flip');
+          this.board.orientation('black');
+        }
+        this.chess = new Chess(fenBoard);
+      } else if (reply === "switch") {
+        console.log("fen : " + fenBoard);
+        console.log("source " + source);
+        console.log("target " + target);
+        this.turn = turn;
+        this.board.position(fenBoard);
+        this.chess.move({ from: source, to: target })
+        // console.log(this.chess.load(fenBoard));
+        console.log(this.chess.ascii());
+      }
+
+    },
+    deleteGame(){
+      UsersApi.deleteGame(this.gameDestInt);
+    },
     disconnect (){
       this.disconnetWM();
       this.board.clear();
-      this.connected = false;
       if (this.isWaiting && this.isHost){
         console.log('sent request to delete the game');
         UsersApi.deleteGame(this.gameDestInt);
       }
+      this.connected = false;
       this.inGame = false;
       this.disconnectDisabled = true;
       this.joinGameDisabled = true;
       this.createGameDisabled = true;
+      this.resumeDisabled = false,
       this.isHost = false;
       this.isWaiting = null;
       this.chess = null;
       this.refresh();
       this.board.flip();
       this.player = 0;
+      this.turn = 0;
       this.opponent = '';
       this.gameDest = '';
       this.gameDestInt = null;
+      this.isGameOver = false;
     }
   },
   stompClient:{
