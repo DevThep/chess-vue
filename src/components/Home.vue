@@ -156,7 +156,7 @@ export default {
       disconnectDisabled: true,
       createGameDisabled: true,
       joinGameDisabled: true,
-      resumeDisabled: false,
+      resumeDisabled: true,
       isHost: false,
       inGame:false,
       opponent: '',
@@ -191,7 +191,7 @@ export default {
         if (that.chess.game_over() === true ||
             (that.chess.turn() === 'w' && piece.search(/^b/) !== -1) ||
             (that.chess.turn() === 'b' && piece.search(/^w/) !== -1)) {  
-          that.isGameOver = true;
+          // that.isGameOver = true;
           that.deleteGame();
           return false;
         }
@@ -519,7 +519,7 @@ export default {
       this.disconnectDisabled = true;
       this.joinGameDisabled = true;
       this.createGameDisabled = true;
-      this.resumeDisabled = false,
+      this.resumeDisabled = true,
       this.isHost = false;
       this.isWaiting = null;
       this.chess = null;
