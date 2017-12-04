@@ -195,7 +195,7 @@ export default {
         console.log("--------------------");
         console.log("player " + that.player);
         console.log("turn " + that.turn);
-        let check =  JSON.stringify({ "from" : that.user , "command" : ""});
+        let check =  JSON.stringify({ "from" : that.user , "command" : "move"});
         if (that.turn != that.player){
           context.sendWM(that.gameDest, check, 0, function (frame) {
             console.log(JSON.parse(frame.body));

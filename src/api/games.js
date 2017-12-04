@@ -3,7 +3,7 @@ import router from '@/router'
 
 export default {
 	gamesAvailable (user, callback) {
-    Vue.$http.get(`/available/${user}`)
+    Vue.$http.get(`/availableGamesBy/${user}`)
     .then(function (response) {
       callback(response.data.game)
     })
@@ -11,7 +11,7 @@ export default {
     })
   },
   ongoingGames (user, callback) {
-    Vue.$http.get(`/ongoing/${user}`)
+    Vue.$http.get(`/ongoingGamesBy/${user}`)
     .then(function (response) {
       callback(response.data.game)
     })
@@ -19,7 +19,7 @@ export default {
     })
   },
   deleteGame (chessID) {
-    Vue.$http.delete(`/delete/${chessID}`)
+    Vue.$http.delete(`/chess/${chessID}`)
     .then(function (response) {
     })
     .catch(function (response) {
