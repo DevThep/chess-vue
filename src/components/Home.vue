@@ -1,13 +1,9 @@
 <template>
   <div>
     <b-navbar toggleable="md" type="dark" variant="info">
-
       <b-navbar-toggle target="nav_collapse"></b-navbar-toggle>
-
       <b-navbar-brand href="#">Chess App</b-navbar-brand>
-
       <b-collapse is-nav id="nav_collapse">
-
         <!-- Right aligned nav items -->
         <b-navbar-nav class="ml-auto">
           <b-nav-item-dropdown right>
@@ -19,33 +15,15 @@
             <b-dropdown-item href="#" @click="logout">Signout</b-dropdown-item>
           </b-nav-item-dropdown>
         </b-navbar-nav>
-
       </b-collapse>
     </b-navbar>
-
     <div class="container-fluid">
       <div class="row">
         <div class="col-lg-12 center_div">
           <b-button @click="connectSrv" variant="success" :disabled=connected>Connect</b-button>
-
-          <b-button @click="showModal" variant="info" :disabled=joinGameDisabled>
-            Join Game Textbox
-          </b-button>
           <b-button @click="disconnect" variant="danger" :disabled=disconnectDisabled>Disconnect</b-button>
-
-          <b-modal ref="myModalRef" hide-footer>
-            <div class="d-block text-center">
-              <h3>Enter the game ID : </h3>
-              <b-form @submit="onSubmit">
-                <b-form-input style="margin-bottom: 5px;" class="col-6 center_div" v-model="form.gameID" type="number" placeholder="game ID"></b-form-input>
-                <b-button type="submit" variant="primary">Join</b-button>
-              </b-form>
-            </div>
-            <b-btn class="mt-3" variant="outline-danger" block @click="hideModal">Close</b-btn>
-          </b-modal>
         </div>
       </div>
-
       <div class="row">
         <div class="col-lg-4" style="padding-top: 15px;">
           <header>Games Available:</header>
@@ -71,7 +49,6 @@
         </div>
         <div class="col-lg-4">
           <div id="board1" class="center_div" style="width: 500px; padding-top: 30px"></div>
-          <b-button style="margin-top: 20px" @click="printBoard">Print Board</b-button>
           <b-button style="margin-top: 20px" @click="create_game" :disabled=createGameDisabled>Create Game</b-button>
         </div>
         <div class="col-lg-4" style="padding-top: 15px;">
@@ -121,7 +98,6 @@
         </div>
       </div>
     </div>
-    
     <br>
   </div>
 </template>
@@ -129,19 +105,14 @@
 <script>
 import router from '../router'
 import UsersApi from '../api/users.js'
+import GamesApi from '../api/games.js'
 
 export default {
   data () {
-    console.log(this.$store.getters.loggedIn)
-    console.log(this.$store.getters.userLoggedIn)
     if (!this.$store.getters.loggedIn) {
       router.push({ name: 'LogIn' })
     }
     return {
-      form: {
-        gameID: null
-      },
-      invokeIdCnt: 0,
       user: this.$store.getters.userLoggedIn,
       player: 0,
       turn: 0,
@@ -173,30 +144,23 @@ export default {
       var removeGreySquares = function() {
         $('#board1 .square-55d63').css('background', '');
       };
-
       var greySquare = function(square) {
         var squareEl = $('#board1 .square-' + square);
-        
         var background = '#a9a9a9';
         if (squareEl.hasClass('black-3c85d') === true) {
           background = '#696969';
         }
-
         squareEl.css('background', background);
       };
-
       var onDragStart = function(source, piece) {
         // do not pick up pieces if the game is over
         // or if it's not that side's turn
-        if (that.chess.game_over() === true ||
-            (that.chess.turn() === 'w' && piece.search(/^b/) !== -1) ||
-            (that.chess.turn() === 'b' && piece.search(/^w/) !== -1)) {  
+        if (that.chess.game_over() === true) {  
           // that.isGameOver = true;
           that.deleteGame();
           return false;
         }
       };
-
       var onMouseoverSquare = function(square, piece) {
         // get list of possible moves for this square
         if (that.chess == null){
@@ -206,25 +170,20 @@ export default {
           square: square,
           verbose: true
         });
-
         // exit if there are no moves available for this square
         if (moves.length === 0) return;
-
         if (that.player == that.turn){
           // highlight the square they moused over
           greySquare(square);
-
           // highlight the possible squares for this piece
           for (var i = 0; i < moves.length; i++) {
             greySquare(moves[i].to);
           }
         }
       };
-
       var onMouseoutSquare = function(square, piece) {
         removeGreySquares();
       };
-
       var onDrop = function(source, target, piece, newPos, oldPos, orientation) {
         removeGreySquares();
         console.log("Source: " + source);
@@ -236,8 +195,7 @@ export default {
         console.log("--------------------");
         console.log("player " + that.player);
         console.log("turn " + that.turn);
-        // board.position('r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R')
-        let check =  JSON.stringify({ "from" : that.user });
+        let check =  JSON.stringify({ "from" : that.user , "command" : ""});
         if (that.turn != that.player){
           context.sendWM(that.gameDest, check, 0, function (frame) {
             console.log(JSON.parse(frame.body));
@@ -279,59 +237,32 @@ export default {
   methods: {
     refresh() {
       var response = [];
-      UsersApi.gamesAvailable(this.user, this.gameRequestCallback);
-      // console.log("arr length:  " + this.gamesAvailable.length);
+      GamesApi.gamesAvailable(this.user, this.gameRequestCallback);
     },
     getPausedGames() {
       var response = [];
-      UsersApi.ongoingGames(this.user, this.pausedGameCallback);
-      // console.log("arr length:  " + this.gamesAvailable.length);
+      GamesApi.ongoingGames(this.user, this.pausedGameCallback);
     },
     gameRequestCallback (response){
-      console.log(response);
       this.gamesAvailable = response;
     },
     pausedGameCallback (response){
-      console.log(response);
       this.gamesPaused = response;
-    },
-    onSubmit (evt) {
-      evt.preventDefault()
-      if (this.form.gameID != null){
-        this.gameDest = "/dest/msg/" + this.form.gameID;
-        this.gameDestInt = this.form.gameID;
-        this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
-        this.$stompClient.subscribe('/sub/game/' + this.form.gameID, this.gameResponse,
-          { id: 'game'+this.gameDestInt }, this.onFailed);
-        let body =  JSON.stringify({ "from" : this.user, "command" : "start" })
-        this.hideModal();
-        this.sendWM(this.gameDest, body, this.invokeIdCnt, this.gameResponse, 3000);
-      }
     },
     join(gameID){
       if (this.connected){
-        this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
+        this.$stompClient.unsubscribe('lobby');
         this.$stompClient.subscribe('/sub/game/' + gameID, this.gameResponse,{ id: 'game'+gameID }, this.onFailed);
         this.gameDest = "/dest/msg/" + gameID;
         this.gameDestInt = gameID;
         let body =  JSON.stringify({ "from" : this.user, "command" : "start" })
-        this.sendWM(this.gameDest, body, this.invokeIdCnt, this.gameResponse, 3000);
+        this.sendWM(this.gameDest, body, 0, this.gameResponse, 3000);
       }
-    },
-    showModal () {
-      this.$refs.myModalRef.show()
-    },
-    hideModal () {
-      this.$refs.myModalRef.hide()
     },
     logout () {
       UsersApi.logout()
     },
-    printBoard (){
-      console.log(this.chess.ascii());
-    },
     onConnected (frame) {
-      console.log('Connected: ' + frame)
       this.connected = true;
       this.joinGameDisabled = false;
       this.resumeDisabled = false;
@@ -340,14 +271,11 @@ export default {
       this.$stompClient.subscribe('/user/sub/message', this.subscribeResponse,{ id: 'lobby' }, this.onFailed);
     },
     onFailed (frame) {
-      console.log('Failed: ' + frame);
       this.connected = false;
     },    
     connectSrv () {
       var headers = {
-        "user": this.user,
-        "passcode": 'guest',
-      //additional header
+        "user": this.user
       };
       this.connetWM('http://localhost:3000/web_socket', headers, this.onConnected, this.onFailed);    
     },
@@ -355,33 +283,28 @@ export default {
       // have to first subscribe to /user/dest/create_game
       let destination = '/dest/create_game'
       let body =  JSON.stringify({ "from" : this.user })
-      console.log('creating here');
-      this.sendWM(destination, body, this.invokeIdCnt, this.responseCallback, 3000);
+      this.sendWM(destination, body, 0, this.responseCallback, 3000);
     },
     resume (gameID,host){
       if (this.connected){
         this.$stompClient.unsubscribe('lobby');//'lobby', this.unsubscribeResponse
         this.$stompClient.subscribe('/sub/game/' + gameID, this.resumedGameResponse,{ id: 'game'+gameID }, this.onFailed);
         this.gameDest = "/dest/msg/" + gameID;
-        console.log(this.gameDest);
         this.gameDestInt = gameID;
-        console.log('Host ' + host);
         if (this.user === host){
           this.isHost = true;
         }
         let body =  JSON.stringify({ "from" : this.user, "command" : "resume" })
-        this.sendWM(this.gameDest, body, this.invokeIdCnt, this.resumedGameResponse, 3000);
+        this.sendWM(this.gameDest, body, 0, this.resumedGameResponse, 3000);
       }
     },
     responseCallback (frame){
     },
     subscribeResponse (frame){
-      console.log(JSON.parse(frame.body));
       let response = JSON.parse(frame.body);
       if (response.type === "gameReq"){
         let chessID = response.chessID;
         let gameDest = "/dest/msg/" + chessID;
-        console.log('DEST ' + gameDest);
         this.gameDest = gameDest;
         this.gameDestInt = chessID;
         this.joinGameDisabled = true;
@@ -389,7 +312,7 @@ export default {
         this.$stompClient.unsubscribe('lobby');
         this.$stompClient.subscribe('/sub/game/' + chessID, this.gameResponse, { id: 'game'+chessID }, this.onFailed);
         let request =  JSON.stringify({ "from" : this.user, "command" : "start" })
-        this.sendWM(this.gameDest, request, this.invokeIdCnt, this.gameResponse, 3000);
+        this.sendWM(this.gameDest, request, 0, this.gameResponse, 3000);
       }
     },
     gameResponse (frame){
@@ -401,7 +324,6 @@ export default {
       let source = JSON.parse(frame.body).source;
       let target = JSON.parse(frame.body).target;
       if (reply === "disconnect"){
-        console.log('Other player offline');
         this.disconnect();
         return;
       }
@@ -411,7 +333,6 @@ export default {
         return;
       }
       if (reply === "wait"){
-        console.log('waiting for P2');
         this.isHost = true;
         this.isWaiting = true;
       } else if (reply === "start"){
@@ -431,19 +352,15 @@ export default {
         this.turn = 1;
         this.board.start();
         if (this.player == 2){
-          console.log('P2 board flip');
-          this.board.flip();
+          this.board.orientation('black');
+        }else {
+          this.board.orientation('white');
         }
         this.chess = new Chess();
       } else if (reply === "switch") {
-        console.log("fen : " + fenBoard);
-        console.log("source " + source);
-        console.log("target " + target);
         this.turn = turn;
         this.board.position(fenBoard);
         this.chess.move({ from: source, to: target })
-        // console.log(this.chess.load(fenBoard));
-        console.log(this.chess.ascii());
       }
     },
     resumedGameResponse (frame){
@@ -455,7 +372,6 @@ export default {
       let source = JSON.parse(frame.body).source;
       let target = JSON.parse(frame.body).target;
       if (reply === "disconnect"){
-        console.log('Other player offline');
         this.disconnect();
         return;
       }
@@ -465,11 +381,9 @@ export default {
         return;
       }
       if (reply === "wait"){
-        console.log('waiting for P2');
         this.resumeDisabled = true;
         this.isWaiting = true;
       } else if (reply === "start"){
-        console.log(JSON.parse(frame.body));
         this.inGame = true;
         this.createGameDisabled = true;
         this.joinGameDisabled = true;
@@ -486,33 +400,26 @@ export default {
         }
         this.turn = turn;
         this.board.position(fenBoard);
-        this.board.orientation('white');
         if (this.player == 2){
-          console.log('P2 board flip');
           this.board.orientation('black');
+        }else {
+          this.board.orientation('white');
         }
         this.chess = new Chess(fenBoard);
       } else if (reply === "switch") {
-        console.log("fen : " + fenBoard);
-        console.log("source " + source);
-        console.log("target " + target);
         this.turn = turn;
         this.board.position(fenBoard);
         this.chess.move({ from: source, to: target })
-        // console.log(this.chess.load(fenBoard));
-        console.log(this.chess.ascii());
       }
-
     },
     deleteGame(){
-      UsersApi.deleteGame(this.gameDestInt);
+      GamesApi.deleteGame(this.gameDestInt);
     },
     disconnect (){
       this.disconnetWM();
       this.board.clear();
       if (this.isWaiting && this.isHost){
-        console.log('sent request to delete the game');
-        UsersApi.deleteGame(this.gameDestInt);
+        this.deleteGame();
       }
       this.connected = false;
       this.inGame = false;
@@ -524,7 +431,6 @@ export default {
       this.isWaiting = null;
       this.chess = null;
       this.refresh();
-      this.board.flip();
       this.player = 0;
       this.turn = 0;
       this.opponent = '';
@@ -541,7 +447,6 @@ export default {
   }
 };
 </script>
-
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
   .center_div{
